@@ -278,6 +278,7 @@ allocate_holder (void * storage)
   FOREACH_MODULE (idx, module_list) {
     allocate_holder_by_module (module_list[idx], storage);
   }
+  return holder;
 }
 
 /* Extract data from the modules GHolder structure and load it into
@@ -1126,13 +1127,13 @@ init_processing (void)
 
 /* Determine the type of output, i.e., JSON, CSV, HTML */
 static void
-standard_output (void *storage)
+standard_output (char * key, void *storage)
 {
   char *csv = NULL, *json = NULL, *html = NULL;
 
   /* CSV */
   if (find_output_type (&csv, "csv", 1) == 0)
-    output_csv (glog, holder, csv, storage);
+    output_csv (glog, holder, csv, key, storage);
   /* JSON */
   if (find_output_type (&json, "json", 1) == 0)
     output_json (glog, holder, json);
@@ -1451,10 +1452,37 @@ main (int argc, char **argv)
   gdns_init ();
   parse_initial_sort ();
 
-  char * k = "TESTSHARDKEY";
-  void* storage = ht_get_gkhmap(k);
-  printf ("\n\n\n\nCOMPARE OF  :%p vs %p\n", ht_get_selected(), (void *)storage);
-  allocate_holder ( storage );
+  khash_t (ssKvstore) * h = ht_get_kghhash();
+  printf("KSTORE IS %p\n", h);
+
+  for (int itr = kh_begin(h); itr != kh_end(h); ++itr) {                                                            \
+    if (!kh_exist(h,itr)) continue;                                                                             \
+    char * kvar = kh_key(h,itr);
+    GKHashStorage * kval = kh_val(h,itr);
+    printf("GOTIT of %s\n", kvar);
+
+
+    allocate_holder ( kval );
+    standard_output ( kvar, kval);
+
+    /* clear holder structure */
+    free_holder (&holder);
+    /* clear reverse dns queue */
+    //gdns_free_queue ();
+  } 
+/*
+  for (int k = 0, k = kh_begin (h); k != kh_end (h); ++k) {
+    if (!kh_exist (h, k))
+      continue;
+    GKHashStorage * tmm = get_ssKvstore (h, k);
+    if (!tmm) 
+      continue;
+    printf("GOT IT %p\n", tmm);
+  }
+*/
+
+  //printf ("\n\n\n\nCOMPARE OF  :%p vs %p\n", ht_get_selected, (void *)storage);
+  //allocate_holder ( storage );
 
   end_spinner ();
   time (&end_proc);
@@ -1463,7 +1491,7 @@ main (int argc, char **argv)
   if (conf.process_and_exit) {
     /* ignore outputting, process only */
   } else if (conf.output_stdout) {
-    standard_output (storage);
+    //standard_output (storage);
   }
   /* curses */
   else {

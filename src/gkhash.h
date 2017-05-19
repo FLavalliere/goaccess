@@ -249,14 +249,15 @@ void ht_get_visitors_min_max (GModule module, int *min, int *max, GKHashStorage 
 
 int ht_insert_gkhmap (const char *key);
 GKHashStorage * ht_get_gkhmap (const char *key);
+khash_t (ssKvstore) * ht_get_kghhash();
 
-/*
-static GKHashStorage * ht_get_selected();
-static void ht_set_selected(GKHashStorage * st);
+GKHashStorage * ht_get_selected();
+void ht_set_selected(GKHashStorage * st);
 
-static GKHashStorage * ht_get_ui_selected();
-static void ht_set_ui_selected(GKHashStorage * st);
-*/
+GKHashStorage * ht_get_ui_selected();
+void ht_set_ui_selected(GKHashStorage * st);
+
+//GKHashStorage * get_ssKvstore (khash_t (ssKvstore) * hash, const char *key);
 
 GRawData *parse_raw_data (GModule module, GKHashStorage * st);
 

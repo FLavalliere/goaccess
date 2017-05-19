@@ -298,7 +298,7 @@ print_csv_summary (FILE * fp, GLog * glog, GKHashStorage* storage)
 
 /* Entry point to generate a a csv report writing it to the fp */
 void
-output_csv (GLog * glog, GHolder * holder, const char *filename, void * storage)
+output_csv (GLog * glog, GHolder * holder, const char *filename, const char * fileshard, void * storage)
 {
   GModule module;
   GPercTotals totals;
@@ -306,9 +306,23 @@ output_csv (GLog * glog, GHolder * holder, const char *filename, void * storage)
   size_t idx = 0;
   FILE *fp;
 
-  fp = (filename != NULL) ? fopen (filename, "w") : stdout;
-  if (!fp)
+   // Determine new size
+   int newSize = strlen(fileshard)  + strlen(filename) + 2; 
+
+   // Allocate new buffer
+   char * newBuffer = (char *)malloc(newSize);
+
+   // do the copy and concat
+   strcpy(newBuffer,fileshard);
+   strcat(newBuffer,"_");
+   strcat(newBuffer,filename); // or strncat
+   printf("TEST SHARD FILENAME=%s-%s\n", fileshard, filename);
+
+  fp = (newBuffer != NULL) ? fopen (newBuffer, "w") : stdout;
+  if (!fp) {
+    free(newBuffer);
     FATAL ("Unable to open CSV file: %s.", strerror (errno));
+  }
 
   //Bad but only for PoC, get the selected storage variable
 //this not match  GKHashStorage* storage = ht_get_selected();
@@ -326,5 +340,7 @@ output_csv (GLog * glog, GHolder * holder, const char *filename, void * storage)
     panel->render (fp, holder + module, totals);
   }
 
+  printf("CLOSGIN BUFUFER OF %s\n", newBuffer);
   fclose (fp);
+  free(newBuffer);
 }

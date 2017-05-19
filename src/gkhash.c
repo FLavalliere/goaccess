@@ -300,6 +300,8 @@ init_storage (void)
   ht_hostnames = (khash_t (ss32) *) new_ss32_ht ();
   ht_unique_keys = (khash_t (si32) *) new_si32_ht ();
   ht_hash = (khash_t (ssKvstore) *) new_ssKvstore_ht ();
+  printf("KSTORE CREATD IS %p\n", ht_hash);
+
 }
 
 static
@@ -1686,7 +1688,7 @@ ins_ssKvstore (khash_t (ssKvstore) * hash, const char *key, GKHashStorage *value
   return 0;
 }
 
-static GKHashStorage *
+GKHashStorage *
 get_ssKvstore (khash_t (ssKvstore) * hash, const char *key)
 {
   khint_t k;
@@ -1768,4 +1770,7 @@ ht_get_gkhmap (const char *key)
 
   return get_ssKvstore (hash, key);
 }
-
+khash_t (ssKvstore) *
+ht_get_kghhash() {
+     return ht_hash;
+}
