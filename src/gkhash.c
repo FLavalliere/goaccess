@@ -315,30 +315,7 @@ init_kvstore_storage (void)
     module = module_list[idx];
 
     gkh_storage[module].module = module;
-    int n1 = 0, k;
-    /* *INDENT-OFF* */
-    GKHashMetric metrics[] = {
-       {MTRC_KEYMAP    , MTRC_TYPE_SI32 , {.si32 = new_si32_ht ()}} ,
-       {MTRC_ROOTMAP   , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
-       {MTRC_DATAMAP   , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
-       {MTRC_UNIQMAP   , MTRC_TYPE_SI32 , {.si32 = new_si32_ht ()}} ,
-       {MTRC_ROOT      , MTRC_TYPE_II32 , {.ii32 = new_ii32_ht ()}} ,
-       {MTRC_HITS      , MTRC_TYPE_II32 , {.ii32 = new_ii32_ht ()}} ,
-       {MTRC_VISITORS  , MTRC_TYPE_II32 , {.ii32 = new_ii32_ht ()}} ,
-       {MTRC_BW        , MTRC_TYPE_IU64 , {.iu64 = new_iu64_ht ()}} ,
-       {MTRC_CUMTS     , MTRC_TYPE_IU64 , {.iu64 = new_iu64_ht ()}} ,
-       {MTRC_MAXTS     , MTRC_TYPE_IU64 , {.iu64 = new_iu64_ht ()}} ,
-       {MTRC_METHODS   , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
-       {MTRC_PROTOCOLS , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
-       {MTRC_AGENTS    , MTRC_TYPE_IGSL , {.igsl = new_igsl_ht ()}} ,
-       {MTRC_METADATA  , MTRC_TYPE_SU64 , {.su64 = new_su64_ht ()}} ,
-     };
-     /* *INDENT-ON* */
-
-     n1 = ARRAY_SIZE (metrics);
-     for (k = 0; k < n1; k++) {
-       gkh_storage[module].metrics[k] = metrics[k];
-     }
+    init_gkh_tables(module, gkh_storage);
   }
   return gkh_storage;
 }
