@@ -43,7 +43,7 @@ void *add_hostname_node (void *ptr_holder);
 void free_holder_by_module (GHolder ** holder, GModule module);
 void free_holder (GHolder ** holder);
 void load_holder_data (GRawData * raw_data, GHolder * h, GModule module,
-                       GSort sort);
+                       GSort sort, void * storage);
 void load_host_to_holder (GHolder * h, char *ip);
 
 #endif // for #ifndef GHOLDER_H

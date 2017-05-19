@@ -298,7 +298,7 @@ print_csv_summary (FILE * fp, GLog * glog, GKHashStorage* storage)
 
 /* Entry point to generate a a csv report writing it to the fp */
 void
-output_csv (GLog * glog, GHolder * holder, const char *filename)
+output_csv (GLog * glog, GHolder * holder, const char *filename, void * storage)
 {
   GModule module;
   GPercTotals totals;
@@ -311,7 +311,7 @@ output_csv (GLog * glog, GHolder * holder, const char *filename)
     FATAL ("Unable to open CSV file: %s.", strerror (errno));
 
   //Bad but only for PoC, get the selected storage variable
-  GKHashStorage* storage = ht_get_selected();
+//this not match  GKHashStorage* storage = ht_get_selected();
 
   if (!conf.no_csv_summary)
     print_csv_summary (fp, glog, storage);

@@ -294,7 +294,6 @@ init_gkh_tables (GModule module, GKHashStorage * gkh_storage)
 void
 init_storage (void)
 {
-  printf("IN INIT STORAGE HERE\n");
   /* Hashes used across the whole app (not per module) */
   ht_agent_keys = (khash_t (si32) *) new_si32_ht ();
   ht_agent_vals = (khash_t (is32) *) new_is32_ht ();
@@ -316,7 +315,30 @@ init_kvstore_storage (void)
     module = module_list[idx];
 
     gkh_storage[module].module = module;
-    init_gkh_tables (module, gkh_storage); //its already a pointer
+    int n1 = 0, k;
+    /* *INDENT-OFF* */
+    GKHashMetric metrics[] = {
+       {MTRC_KEYMAP    , MTRC_TYPE_SI32 , {.si32 = new_si32_ht ()}} ,
+       {MTRC_ROOTMAP   , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
+       {MTRC_DATAMAP   , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
+       {MTRC_UNIQMAP   , MTRC_TYPE_SI32 , {.si32 = new_si32_ht ()}} ,
+       {MTRC_ROOT      , MTRC_TYPE_II32 , {.ii32 = new_ii32_ht ()}} ,
+       {MTRC_HITS      , MTRC_TYPE_II32 , {.ii32 = new_ii32_ht ()}} ,
+       {MTRC_VISITORS  , MTRC_TYPE_II32 , {.ii32 = new_ii32_ht ()}} ,
+       {MTRC_BW        , MTRC_TYPE_IU64 , {.iu64 = new_iu64_ht ()}} ,
+       {MTRC_CUMTS     , MTRC_TYPE_IU64 , {.iu64 = new_iu64_ht ()}} ,
+       {MTRC_MAXTS     , MTRC_TYPE_IU64 , {.iu64 = new_iu64_ht ()}} ,
+       {MTRC_METHODS   , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
+       {MTRC_PROTOCOLS , MTRC_TYPE_IS32 , {.is32 = new_is32_ht ()}} ,
+       {MTRC_AGENTS    , MTRC_TYPE_IGSL , {.igsl = new_igsl_ht ()}} ,
+       {MTRC_METADATA  , MTRC_TYPE_SU64 , {.su64 = new_su64_ht ()}} ,
+     };
+     /* *INDENT-ON* */
+
+     n1 = ARRAY_SIZE (metrics);
+     for (k = 0; k < n1; k++) {
+       gkh_storage[module].metrics[k] = metrics[k];
+     }
   }
   return gkh_storage;
 }
@@ -1696,13 +1718,11 @@ get_ssKvstore (khash_t (ssKvstore) * hash, const char *key)
   if (!hash)
     return NULL;
 
-  printf("GOT KEY OF %s", key);
   k = kh_get (ssKvstore, hash, key);
   /* key found, return current value pointer do not duplicate it */
   if (k != kh_end (hash) && (value = kh_val (hash, k)))
     return value;
 
-  printf("COULD NOT FIND KEY : %s", key);
 
   return NULL;
 }
@@ -1748,19 +1768,15 @@ ht_insert_gkhmap (const char *key)
 {
   khash_t (ssKvstore) * hash = ht_hash;
 
-  printf("AAA\n");
   if (!hash)
     return -1;
   
-  printf("BAA\n");
   GKHashStorage * val = init_kvstore_storage();
 
-  printf("CAA\n");
   //set the first storage selected for default UI, later we could change using a rest api / dropdown menu
   if (gkh_selected_storage == NULL) {
      gkh_selected_storage = val;
   }
-  printf("DAA usng key : %s\n", key);
   return ins_ssKvstore (hash, key, val);
 }
 
@@ -1770,7 +1786,6 @@ ht_get_gkhmap (const char *key)
   khash_t (ssKvstore) * hash = ht_hash;
 
   if (!hash)  {
-    printf("HASH WAS NOT INITIALIZED\n");
     return NULL;
   }
 

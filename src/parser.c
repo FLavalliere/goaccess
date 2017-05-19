@@ -2440,7 +2440,6 @@ map_log (GLogItem * logitem, const GParse * parse, GModule module, GKHashStorage
   GKeyData kdata;
   char *uniq_key = NULL;
 
-  printf("STORAGE IS %d\n", storage);
   new_modulekey (&kdata);
   if (parse->key_data (&kdata, logitem) == 1)
     return;
@@ -2477,9 +2476,11 @@ process_log (GLogItem * logitem)
   
   //HERE WE NEED TO SELECT THE SHARD
   char * key = logitem->shard;
+  if (key == NULL) { 
+      logitem->agent = alloc_string ("Default");
+  }
   GKHashStorage* storage = NULL;
 
-  printf("Will use shard key of %s", key);
   storage = ht_get_gkhmap(key);
   if ( storage == NULL) {
       int t = ht_insert_gkhmap (key);

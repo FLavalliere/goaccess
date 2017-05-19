@@ -253,30 +253,30 @@ daemonize (void)
 /* Extract data from the given module hash structure and allocate +
  * load data from the hash table into an instance of GHolder */
 static void
-allocate_holder_by_module (GModule module)
+allocate_holder_by_module (GModule module, void* storage)
 {
   GRawData *raw_data;
 
   /* extract data from the corresponding hash table */
-  raw_data = parse_raw_data (module, ht_get_selected());
+  raw_data = parse_raw_data (module, storage);
   if (!raw_data) {
     LOG_DEBUG (("raw data is NULL for module: %d.\n", module));
     return;
   }
 
-  load_holder_data (raw_data, holder + module, module, module_sort[module]);
+  load_holder_data (raw_data, holder + module, module, module_sort[module], storage);
 }
 
 /* Iterate over all modules/panels and extract data from hash
  * structures and load it into an instance of GHolder */
 static void
-allocate_holder (void)
+allocate_holder (void * storage)
 {
   size_t idx = 0;
 
   holder = new_gholder (TOTAL_MODULES);
   FOREACH_MODULE (idx, module_list) {
-    allocate_holder_by_module (module_list[idx]);
+    allocate_holder_by_module (module_list[idx], storage);
   }
 }
 
@@ -469,7 +469,7 @@ expand_current_module (void)
 
   free_holder_by_module (&holder, gscroll.current);
   free_dashboard (dash);
-  allocate_holder_by_module (gscroll.current);
+  //allocate_holder_by_module (gscroll.current);
   allocate_data ();
 }
 
@@ -489,7 +489,7 @@ expand_module_from_ypos (int y)
 
   free_holder_by_module (&holder, gscroll.current);
   free_dashboard (dash);
-  allocate_holder_by_module (gscroll.current);
+  //allocate_holder_by_module (gscroll.current);
   allocate_data ();
 
   render_screens ();
@@ -645,7 +645,7 @@ tail_term (void)
   pthread_mutex_unlock (&gdns_thread.mutex);
 
   free_dashboard (dash);
-  allocate_holder ();
+  allocate_holder (ht_get_selected());
   allocate_data ();
 
   term_size (main_win, &main_win_height);
@@ -662,7 +662,7 @@ tail_html (void)
   pthread_cond_broadcast (&gdns_thread.not_empty);
   pthread_mutex_unlock (&gdns_thread.mutex);
 
-  allocate_holder ();
+  allocate_holder (ht_get_selected());
 
   pthread_mutex_lock (&gdns_thread.mutex);
   json = get_json (glog, holder, 0);
@@ -890,7 +890,7 @@ render_sort_dialog (void)
   pthread_mutex_unlock (&gdns_thread.mutex);
 
   free_dashboard (dash);
-  allocate_holder ();
+  allocate_holder (ht_get_selected());
   allocate_data ();
   render_screens ();
 }
@@ -1126,13 +1126,13 @@ init_processing (void)
 
 /* Determine the type of output, i.e., JSON, CSV, HTML */
 static void
-standard_output (void)
+standard_output (void *storage)
 {
   char *csv = NULL, *json = NULL, *html = NULL;
 
   /* CSV */
   if (find_output_type (&csv, "csv", 1) == 0)
-    output_csv (glog, holder, csv);
+    output_csv (glog, holder, csv, storage);
   /* JSON */
   if (find_output_type (&json, "json", 1) == 0)
     output_json (glog, holder, json);
@@ -1447,14 +1447,14 @@ main (int argc, char **argv)
     goto clean;
   glog->offset = glog->processed;
 
-  printf("OK Great, we have parsed all the data.. process_log has completed\n");
   /* init reverse lookup thread */
   gdns_init ();
   parse_initial_sort ();
-  printf("OK Great, we have parsed all the data.. going into allocate_holder\n");
-printf ("TEST :%d\n", ht_get_selected());
-  allocate_holder ();
-  printf("OK Great, we have parsed all the data.. after allocate_holder\n");
+
+  char * k = "TESTSHARDKEY";
+  void* storage = ht_get_gkhmap(k);
+  printf ("\n\n\n\nCOMPARE OF  :%p vs %p\n", ht_get_selected(), (void *)storage);
+  allocate_holder ( storage );
 
   end_spinner ();
   time (&end_proc);
@@ -1463,7 +1463,7 @@ printf ("TEST :%d\n", ht_get_selected());
   if (conf.process_and_exit) {
     /* ignore outputting, process only */
   } else if (conf.output_stdout) {
-    standard_output ();
+    standard_output (storage);
   }
   /* curses */
   else {

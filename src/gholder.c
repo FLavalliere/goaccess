@@ -574,7 +574,7 @@ add_root_to_holder (GRawDataItem item, GHolder * h, GRawDataType type,
 
 /* Load raw data into our holder structure */
 void
-load_holder_data (GRawData * raw_data, GHolder * h, GModule module, GSort sort)
+load_holder_data (GRawData * raw_data, GHolder * h, GModule module, GSort sort, void* storage)
 {
   int i, size = 0, max_choices = get_max_choices ();
   const GPanel *panel = panel_lookup (module);
@@ -588,7 +588,7 @@ load_holder_data (GRawData * raw_data, GHolder * h, GModule module, GSort sort)
   h->items = new_gholder_item (h->holder_size);
 
   for (i = 0; i < h->holder_size; i++) {
-    panel->insert (raw_data->items[i], h, raw_data->type, panel, ht_get_selected());
+    panel->insert (raw_data->items[i], h, raw_data->type, panel, storage);
   }
   sort_holder_items (h->items, h->idx, sort);
   if (h->sub_items_size)
