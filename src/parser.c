@@ -2440,6 +2440,7 @@ map_log (GLogItem * logitem, const GParse * parse, GModule module, GKHashStorage
   GKeyData kdata;
   char *uniq_key = NULL;
 
+  printf("STORAGE IS %d\n", storage);
   new_modulekey (&kdata);
   if (parse->key_data (&kdata, logitem) == 1)
     return;

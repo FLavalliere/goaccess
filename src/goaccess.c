@@ -1452,6 +1452,7 @@ main (int argc, char **argv)
   gdns_init ();
   parse_initial_sort ();
   printf("OK Great, we have parsed all the data.. going into allocate_holder\n");
+printf ("TEST :%d\n", ht_get_selected());
   allocate_holder ();
   printf("OK Great, we have parsed all the data.. after allocate_holder\n");
 

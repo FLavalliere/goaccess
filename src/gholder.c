@@ -54,7 +54,7 @@ typedef struct GPanel_
 {
   GModule module;
   void (*insert) (GRawDataItem item, GHolder * h, GRawDataType type,
-                  const struct GPanel_ *);
+                  const struct GPanel_ *, void *);
   void (*holder_callback) (GHolder * h);
   void (*lookup) (GRawDataItem item);
 } GPanel;
@@ -588,7 +588,7 @@ load_holder_data (GRawData * raw_data, GHolder * h, GModule module, GSort sort)
   h->items = new_gholder_item (h->holder_size);
 
   for (i = 0; i < h->holder_size; i++) {
-    panel->insert (raw_data->items[i], h, raw_data->type, panel);
+    panel->insert (raw_data->items[i], h, raw_data->type, panel, ht_get_selected());
   }
   sort_holder_items (h->items, h->idx, sort);
   if (h->sub_items_size)
