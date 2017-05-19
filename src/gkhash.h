@@ -198,53 +198,67 @@ typedef struct GKHashStorage_
   GKHashMetric metrics[GSMTRC_TOTAL];
 } GKHashStorage;
 
+KHASH_MAP_INIT_STR (ssKvstore, GKHashStorage *);
+
 void free_storage (void);
 void init_storage (void);
 
-int ht_insert_agent_key (const char *key);
-int ht_insert_agent_value (int key, const char *value);
+int ht_insert_agent_key (const char *key); //global should we make it part of a new object such as GKHahsStorageMap instead of our new Shard map?
+int ht_insert_agent_value (int key, const char *value);// same.., GKHashStorage *st);
 int ht_insert_unique_key (const char *key);
 
-int ht_insert_agent (GModule module, int key, int value);
-int ht_insert_bw (GModule module, int key, uint64_t inc);
-int ht_insert_cumts (GModule module, int key, uint64_t inc);
-int ht_insert_datamap (GModule module, int key, const char *value);
-int ht_insert_hits (GModule module, int key, int inc);
+int ht_insert_agent (GModule module, int key, int value, GKHashStorage *st);
+int ht_insert_bw (GModule module, int key, uint64_t inc, GKHashStorage *st);
+int ht_insert_cumts (GModule module, int key, uint64_t inc, GKHashStorage *st);
+int ht_insert_datamap (GModule module, int key, const char *value, GKHashStorage *st);
+int ht_insert_hits (GModule module, int key, int inc, GKHashStorage *st);
 int ht_insert_hostname (const char *ip, const char *host);
-int ht_insert_keymap (GModule module, const char *key);
-int ht_insert_maxts (GModule module, int key, uint64_t value);
-int ht_insert_meta_data (GModule module, const char *key, uint64_t value);
-int ht_insert_method (GModule module, int key, const char *value);
-int ht_insert_protocol (GModule module, int key, const char *value);
-int ht_insert_root (GModule module, int key, int value);
-int ht_insert_rootmap (GModule module, int key, const char *value);
-int ht_insert_uniqmap (GModule module, const char *key);
-int ht_insert_visitor (GModule module, int key, int inc);
+int ht_insert_keymap (GModule module, const char *key, GKHashStorage *st);
+int ht_insert_maxts (GModule module, int key, uint64_t value, GKHashStorage *st);
+int ht_insert_meta_data (GModule module, const char *key, uint64_t value, GKHashStorage *st);
+int ht_insert_method (GModule module, int key, const char *value, GKHashStorage *st);
+int ht_insert_protocol (GModule module, int key, const char *value, GKHashStorage *st);
+int ht_insert_root (GModule module, int key, int value, GKHashStorage *st);
+int ht_insert_rootmap (GModule module, int key, const char *value, GKHashStorage *st);
+int ht_insert_uniqmap (GModule module, const char *key, GKHashStorage *st);
+int ht_insert_visitor (GModule module, int key, int inc, GKHashStorage *st);
 
-uint32_t ht_get_size_datamap (GModule module);
-uint32_t ht_get_size_uniqmap (GModule module);
+uint32_t ht_get_size_datamap (GModule module, GKHashStorage *st);
+uint32_t ht_get_size_uniqmap (GModule module, GKHashStorage *st);
 
-char *ht_get_datamap (GModule module, int key);
-char *ht_get_host_agent_val (int key);
+char *ht_get_datamap (GModule module, int key, GKHashStorage *st);
+char *ht_get_host_agent_val (int key); //GKHashStorage *st);
 char *ht_get_hostname (const char *host);
-char *ht_get_method (GModule module, int key);
-char *ht_get_protocol (GModule module, int key);
-char *ht_get_root (GModule module, int key);
-GSLList *ht_get_host_agent_list (GModule module, int key);
-int ht_get_hits (GModule module, int key);
-int ht_get_keymap (GModule module, const char *key);
-int ht_get_uniqmap (GModule module, const char *key);
-int ht_get_visitors (GModule module, int key);
-uint64_t ht_get_bw (GModule module, int key);
-uint64_t ht_get_cumts (GModule module, int key);
-uint64_t ht_get_maxts (GModule module, int key);
-uint64_t ht_get_meta_data (GModule module, const char *key);
-void ht_get_bw_min_max (GModule module, uint64_t * min, uint64_t * max);
-void ht_get_cumts_min_max (GModule module, uint64_t * min, uint64_t * max);
-void ht_get_hits_min_max (GModule module, int *min, int *max);
-void ht_get_maxts_min_max (GModule module, uint64_t * min, uint64_t * max);
-void ht_get_visitors_min_max (GModule module, int *min, int *max);
+char *ht_get_method (GModule module, int key, GKHashStorage *st);
+char *ht_get_protocol (GModule module, int key, GKHashStorage *st);
+char *ht_get_root (GModule module, int key, GKHashStorage *st);
+GSLList *ht_get_host_agent_list (GModule module, int key, GKHashStorage *st);
+int ht_get_hits (GModule module, int key, GKHashStorage *st);
+int ht_get_keymap (GModule module, const char *key, GKHashStorage *st);
+int ht_get_uniqmap (GModule module, const char *key, GKHashStorage *st);
+int ht_get_visitors (GModule module, int key, GKHashStorage *st);
+uint64_t ht_get_bw (GModule module, int key, GKHashStorage *st);
+uint64_t ht_get_cumts (GModule module, int key, GKHashStorage *st);
+uint64_t ht_get_maxts (GModule module, int key, GKHashStorage *st);
+uint64_t ht_get_meta_data (GModule module, const char *key, GKHashStorage *st);
+void ht_get_bw_min_max (GModule module, uint64_t * min, uint64_t * max, GKHashStorage *st);
+void ht_get_cumts_min_max (GModule module, uint64_t * min, uint64_t * max, GKHashStorage *st);
+void ht_get_hits_min_max (GModule module, int *min, int *max, GKHashStorage *st);
+void ht_get_maxts_min_max (GModule module, uint64_t * min, uint64_t * max, GKHashStorage *st);
+void ht_get_visitors_min_max (GModule module, int *min, int *max, GKHashStorage *st);
 
-GRawData *parse_raw_data (GModule module);
+int ht_insert_gkhmap (const char *key);
+GKHashStorage * ht_get_gkhmap (const char *key);
+
+/*
+static GKHashStorage * ht_get_selected();
+static void ht_set_selected(GKHashStorage * st);
+
+static GKHashStorage * ht_get_ui_selected();
+static void ht_set_ui_selected(GKHashStorage * st);
+*/
+
+GRawData *parse_raw_data (GModule module, GKHashStorage * st);
+
 
 #endif // for #ifndef GKHASH_H

@@ -47,7 +47,9 @@
 #include "xmalloc.h"
 
 /* Hash tables storage */
-static GKHashStorage *gkh_storage;
+
+//selected storage currently this is also used by all components so not good... we should have another  one for UI context menu etc..
+static GKHashStorage *gkh_selected_storage;//gkh_storage;
 
 /* *INDENT-OFF* */
 /* Hash tables used across the whole app */
@@ -55,6 +57,7 @@ static khash_t (is32) *ht_agent_vals  = NULL;
 static khash_t (si32) *ht_agent_keys  = NULL;
 static khash_t (si32) *ht_unique_keys = NULL;
 static khash_t (ss32) *ht_hostnames   = NULL;
+static khash_t (ssKvstore) *ht_hash   = NULL;
 /* *INDENT-ON* */
 static GKHashStorage *
 new_gkhstorage (uint32_t size)
@@ -105,6 +108,15 @@ khash_t (ss32) *
 new_ss32_ht (void)
 {
   khash_t (ss32) * h = kh_init (ss32);
+  return h;
+}
+
+/* Initialize a new string key - GKhash* value hash table */
+static
+khash_t (ssKvstore) *
+new_ssKvstore_ht (void)
+{
+  khash_t (ssKvstore) * h = kh_init (ssKvstore);
   return h;
 }
 
@@ -180,6 +192,26 @@ des_ss32_free (khash_t (ss32) * hash)
   kh_destroy (ss32, hash);
 }
 
+/* Destroys both the hash structure and its GKHash* reference..
+ * keys and string values */
+static void
+des_ssKvstore_free (khash_t (ssKvstore) * hash)
+{
+  khint_t k;
+  if (!hash)
+    return;
+
+  for (k = 0; k < kh_end (hash); ++k) {
+    if (kh_exist (hash, k)) {
+      free ((char *) kh_key (hash, k));
+      free_gkh_storage ((GKHashStorage *) kh_value (hash, k));
+      free ((GKHashStorage *) kh_value (hash, k));
+    }
+  }
+
+  kh_destroy (ssKvstore, hash);
+}
+
 /* Destroys the hash structure */
 static void
 des_ii32 (khash_t (ii32) * hash)
@@ -230,7 +262,7 @@ des_iu64 (khash_t (iu64) * hash)
 
 /* Initialize map & metric hashes */
 static void
-init_tables (GModule module)
+init_gkh_tables (GModule module, GKHashStorage * gkh_storage)
 {
   int n = 0, i;
   /* *INDENT-OFF* */
@@ -262,22 +294,31 @@ init_tables (GModule module)
 void
 init_storage (void)
 {
-  GModule module;
-  size_t idx = 0;
-
+  printf("IN INIT STORAGE HERE\n");
   /* Hashes used across the whole app (not per module) */
   ht_agent_keys = (khash_t (si32) *) new_si32_ht ();
   ht_agent_vals = (khash_t (is32) *) new_is32_ht ();
   ht_hostnames = (khash_t (ss32) *) new_ss32_ht ();
   ht_unique_keys = (khash_t (si32) *) new_si32_ht ();
+  ht_hash = (khash_t (ssKvstore) *) new_ssKvstore_ht ();
+}
 
-  gkh_storage = new_gkhstorage (TOTAL_MODULES);
+static
+GKHashStorage*
+init_kvstore_storage (void)
+{
+  GModule module;
+  size_t idx = 0;
+
+  //create a new object we will free on cleanup
+  GKHashStorage * gkh_storage = new_gkhstorage (TOTAL_MODULES);
   FOREACH_MODULE (idx, module_list) {
     module = module_list[idx];
 
     gkh_storage[module].module = module;
-    init_tables (module);
+    init_gkh_tables (module, gkh_storage); //its already a pointer
   }
+  return gkh_storage;
 }
 
 static void
@@ -311,7 +352,7 @@ free_metric_type (GKHashMetric mtrc)
 
 /* Destroys the hash structure allocated metrics */
 static void
-free_metrics (GModule module)
+free_metrics (GModule module, GKHashStorage* gkh_storage)
 {
   int i;
   GKHashMetric mtrc;
@@ -326,18 +367,23 @@ free_metrics (GModule module)
 void
 free_storage (void)
 {
-  size_t idx = 0;
-
   des_is32_free (ht_agent_vals);
   des_si32_free (ht_agent_keys);
   des_si32_free (ht_unique_keys);
   des_ss32_free (ht_hostnames);
+}
+
+void
+free_gkh_storage (GKHashStorage* gkh_storage)
+{
+  size_t idx = 0;
+
 
   if (!gkh_storage)
     return;
 
   FOREACH_MODULE (idx, module_list) {
-    free_metrics (module_list[idx]);
+    free_metrics (module_list[idx], gkh_storage);
   }
   free (gkh_storage);
 }
@@ -347,7 +393,7 @@ free_storage (void)
  * On error, or if table is not found, NULL is returned.
  * On success the hash structure pointer is returned. */
 static void *
-get_hash (GModule module, GSMetric metric)
+get_hash (GModule module, GSMetric metric, GKHashStorage * gkh_storage)
 {
   void *hash = NULL;
   int i;
@@ -935,10 +981,10 @@ ht_insert_agent_value (int key, const char *value)
  * On error, -1 is returned.
  * On success the value of the key inserted is returned */
 int
-ht_insert_keymap (GModule module, const char *key)
+ht_insert_keymap (GModule module, const char *key, GKHashStorage * storage)
 {
   int value = -1;
-  khash_t (si32) * hash = get_hash (module, MTRC_KEYMAP);
+  khash_t (si32) * hash = get_hash (module, MTRC_KEYMAP, storage);
 
   if (!hash)
     return -1;
@@ -954,9 +1000,9 @@ ht_insert_keymap (GModule module, const char *key)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_datamap (GModule module, int key, const char *value)
+ht_insert_datamap (GModule module, int key, const char *value, GKHashStorage * storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP);
+  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP, storage);
 
   if (!hash)
     return -1;
@@ -969,9 +1015,9 @@ ht_insert_datamap (GModule module, int key, const char *value)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_rootmap (GModule module, int key, const char *value)
+ht_insert_rootmap (GModule module, int key, const char *value, GKHashStorage * storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_ROOTMAP);
+  khash_t (is32) * hash = get_hash (module, MTRC_ROOTMAP, storage);
 
   if (!hash)
     return -1;
@@ -985,10 +1031,10 @@ ht_insert_rootmap (GModule module, int key, const char *value)
  * On error, -1 is returned.
  * On success the value of the key inserted is returned */
 int
-ht_insert_uniqmap (GModule module, const char *key)
+ht_insert_uniqmap (GModule module, const char *key, GKHashStorage * storage)
 {
   int value = -1;
-  khash_t (si32) * hash = get_hash (module, MTRC_UNIQMAP);
+  khash_t (si32) * hash = get_hash (module, MTRC_UNIQMAP, storage);
 
   if (!hash)
     return -1;
@@ -1004,9 +1050,9 @@ ht_insert_uniqmap (GModule module, const char *key)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_root (GModule module, int key, int value)
+ht_insert_root (GModule module, int key, int value, GKHashStorage *storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_ROOT);
+  khash_t (ii32) * hash = get_hash (module, MTRC_ROOT, storage);
 
   if (!hash)
     return -1;
@@ -1019,9 +1065,9 @@ ht_insert_root (GModule module, int key, int value)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_meta_data (GModule module, const char *key, uint64_t value)
+ht_insert_meta_data (GModule module, const char *key, uint64_t value, GKHashStorage * storage)
 {
-  khash_t (su64) * hash = get_hash (module, MTRC_METADATA);
+  khash_t (su64) * hash = get_hash (module, MTRC_METADATA, storage);
 
   if (!hash)
     return -1;
@@ -1034,9 +1080,9 @@ ht_insert_meta_data (GModule module, const char *key, uint64_t value)
  * On error, -1 is returned.
  * On success the inserted value is returned */
 int
-ht_insert_hits (GModule module, int key, int inc)
+ht_insert_hits (GModule module, int key, int inc, GKHashStorage * storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_HITS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_HITS, storage);
 
   if (!hash)
     return -1;
@@ -1049,9 +1095,9 @@ ht_insert_hits (GModule module, int key, int inc)
  * On error, -1 is returned.
  * On success the inserted value is returned */
 int
-ht_insert_visitor (GModule module, int key, int inc)
+ht_insert_visitor (GModule module, int key, int inc, GKHashStorage *storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_VISITORS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_VISITORS, storage);
 
   if (!hash)
     return -1;
@@ -1064,9 +1110,9 @@ ht_insert_visitor (GModule module, int key, int inc)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_bw (GModule module, int key, uint64_t inc)
+ht_insert_bw (GModule module, int key, uint64_t inc, GKHashStorage * storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_BW);
+  khash_t (iu64) * hash = get_hash (module, MTRC_BW, storage);
 
   if (!hash)
     return -1;
@@ -1079,9 +1125,9 @@ ht_insert_bw (GModule module, int key, uint64_t inc)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_cumts (GModule module, int key, uint64_t inc)
+ht_insert_cumts (GModule module, int key, uint64_t inc, GKHashStorage * storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_CUMTS);
+  khash_t (iu64) * hash = get_hash (module, MTRC_CUMTS, storage);
 
   if (!hash)
     return -1;
@@ -1095,10 +1141,10 @@ ht_insert_cumts (GModule module, int key, uint64_t inc)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_maxts (GModule module, int key, uint64_t value)
+ht_insert_maxts (GModule module, int key, uint64_t value, GKHashStorage * storage)
 {
   uint64_t curvalue = 0;
-  khash_t (iu64) * hash = get_hash (module, MTRC_MAXTS);
+  khash_t (iu64) * hash = get_hash (module, MTRC_MAXTS, storage);
 
   if (!hash)
     return -1;
@@ -1114,9 +1160,9 @@ ht_insert_maxts (GModule module, int key, uint64_t value)
  * On error, or if key exists, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_method (GModule module, int key, const char *value)
+ht_insert_method (GModule module, int key, const char *value, GKHashStorage * storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_METHODS);
+  khash_t (is32) * hash = get_hash (module, MTRC_METHODS, storage);
 
   if (!hash)
     return -1;
@@ -1129,9 +1175,9 @@ ht_insert_method (GModule module, int key, const char *value)
  * On error, or if key exists, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_protocol (GModule module, int key, const char *value)
+ht_insert_protocol (GModule module, int key, const char *value, GKHashStorage *storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_PROTOCOLS);
+  khash_t (is32) * hash = get_hash (module, MTRC_PROTOCOLS, storage);
 
   if (!hash)
     return -1;
@@ -1144,9 +1190,9 @@ ht_insert_protocol (GModule module, int key, const char *value)
  * On error, -1 is returned.
  * On success 0 is returned */
 int
-ht_insert_agent (GModule module, int key, int value)
+ht_insert_agent (GModule module, int key, int value, GKHashStorage * storage)
 {
-  khash_t (igsl) * hash = get_hash (module, MTRC_AGENTS);
+  khash_t (igsl) * hash = get_hash (module, MTRC_AGENTS, storage);
 
   if (!hash)
     return -1;
@@ -1173,9 +1219,9 @@ ht_insert_hostname (const char *ip, const char *host)
  *
  * Return -1 if the operation fails, else number of elements. */
 uint32_t
-ht_get_size_datamap (GModule module)
+ht_get_size_datamap (GModule module, GKHashStorage *storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP);
+  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP, storage);
 
   if (!hash)
     return 0;
@@ -1188,9 +1234,9 @@ ht_get_size_datamap (GModule module)
  * On error, 0 is returned.
  * On success the number of elements in MTRC_UNIQMAP is returned */
 uint32_t
-ht_get_size_uniqmap (GModule module)
+ht_get_size_uniqmap (GModule module, GKHashStorage *storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_UNIQMAP);
+  khash_t (is32) * hash = get_hash (module, MTRC_UNIQMAP, storage);
 
   if (!hash)
     return 0;
@@ -1203,9 +1249,9 @@ ht_get_size_uniqmap (GModule module)
  * On error, NULL is returned.
  * On success the string value for the given key is returned */
 char *
-ht_get_datamap (GModule module, int key)
+ht_get_datamap (GModule module, int key, GKHashStorage *storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP);
+  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP, storage);
 
   if (!hash)
     return NULL;
@@ -1218,9 +1264,9 @@ ht_get_datamap (GModule module, int key)
  * On error, -1 is returned.
  * On success the int value for the given key is returned */
 int
-ht_get_keymap (GModule module, const char *key)
+ht_get_keymap (GModule module, const char *key, GKHashStorage *storage)
 {
-  khash_t (si32) * hash = get_hash (module, MTRC_KEYMAP);
+  khash_t (si32) * hash = get_hash (module, MTRC_KEYMAP, storage);
 
   if (!hash)
     return -1;
@@ -1233,9 +1279,9 @@ ht_get_keymap (GModule module, const char *key)
  * On error, -1 is returned.
  * On success the int value for the given key is returned */
 int
-ht_get_uniqmap (GModule module, const char *key)
+ht_get_uniqmap (GModule module, const char *key, GKHashStorage * storage)
 {
-  khash_t (si32) * hash = get_hash (module, MTRC_UNIQMAP);
+  khash_t (si32) * hash = get_hash (module, MTRC_UNIQMAP, storage);
 
   if (!hash)
     return -1;
@@ -1248,11 +1294,11 @@ ht_get_uniqmap (GModule module, const char *key)
  * On error, NULL is returned.
  * On success the string value for the given key is returned */
 char *
-ht_get_root (GModule module, int key)
+ht_get_root (GModule module, int key, GKHashStorage * storage)
 {
   int root_key = 0;
-  khash_t (ii32) * hashroot = get_hash (module, MTRC_ROOT);
-  khash_t (is32) * hashrootmap = get_hash (module, MTRC_ROOTMAP);
+  khash_t (ii32) * hashroot = get_hash (module, MTRC_ROOT, storage);
+  khash_t (is32) * hashrootmap = get_hash (module, MTRC_ROOTMAP, storage);
 
   if (!hashroot || !hashrootmap)
     return NULL;
@@ -1270,9 +1316,9 @@ ht_get_root (GModule module, int key)
  * On error, -1 is returned.
  * On success the int value for the given key is returned */
 int
-ht_get_visitors (GModule module, int key)
+ht_get_visitors (GModule module, int key, GKHashStorage *storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_VISITORS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_VISITORS, storage);
 
   if (!hash)
     return -1;
@@ -1286,9 +1332,9 @@ ht_get_visitors (GModule module, int key)
  * On error, -1 is returned.
  * On success the int value for the given key is returned */
 int
-ht_get_hits (GModule module, int key)
+ht_get_hits (GModule module, int key, GKHashStorage *storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_HITS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_HITS, storage);
 
   if (!hash)
     return -1;
@@ -1301,9 +1347,9 @@ ht_get_hits (GModule module, int key)
  * On error, or if key is not found, 0 is returned.
  * On success the uint64_t value for the given key is returned */
 uint64_t
-ht_get_bw (GModule module, int key)
+ht_get_bw (GModule module, int key, GKHashStorage * storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_BW);
+  khash_t (iu64) * hash = get_hash (module, MTRC_BW, storage);
 
   if (!hash)
     return 0;
@@ -1316,9 +1362,9 @@ ht_get_bw (GModule module, int key)
  * On error, or if key is not found, 0 is returned.
  * On success the uint64_t value for the given key is returned */
 uint64_t
-ht_get_cumts (GModule module, int key)
+ht_get_cumts (GModule module, int key, GKHashStorage *storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_CUMTS);
+  khash_t (iu64) * hash = get_hash (module, MTRC_CUMTS, storage);
 
   if (!hash)
     return 0;
@@ -1331,9 +1377,9 @@ ht_get_cumts (GModule module, int key)
  * On error, or if key is not found, 0 is returned.
  * On success the uint64_t value for the given key is returned */
 uint64_t
-ht_get_maxts (GModule module, int key)
+ht_get_maxts (GModule module, int key, GKHashStorage *storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_MAXTS);
+  khash_t (iu64) * hash = get_hash (module, MTRC_MAXTS, storage);
 
   if (!hash)
     return 0;
@@ -1346,9 +1392,9 @@ ht_get_maxts (GModule module, int key)
  * On error, NULL is returned.
  * On success the string value for the given key is returned */
 char *
-ht_get_method (GModule module, int key)
+ht_get_method (GModule module, int key,GKHashStorage *storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_METHODS);
+  khash_t (is32) * hash = get_hash (module, MTRC_METHODS, storage);
 
   if (!hash)
     return NULL;
@@ -1361,9 +1407,9 @@ ht_get_method (GModule module, int key)
  * On error, NULL is returned.
  * On success the string value for the given key is returned */
 char *
-ht_get_protocol (GModule module, int key)
+ht_get_protocol (GModule module, int key,GKHashStorage *storage)
 {
-  khash_t (is32) * hash = get_hash (module, MTRC_PROTOCOLS);
+  khash_t (is32) * hash = get_hash (module, MTRC_PROTOCOLS, storage);
 
   if (!hash)
     return NULL;
@@ -1406,9 +1452,9 @@ ht_get_host_agent_val (int key)
  * On error, or if key is not found, NULL is returned.
  * On success the GSLList value for the given key is returned */
 GSLList *
-ht_get_host_agent_list (GModule module, int key)
+ht_get_host_agent_list (GModule module, int key, GKHashStorage *storage)
 {
-  khash_t (igsl) * hash = get_hash (module, MTRC_AGENTS);
+  khash_t (igsl) * hash = get_hash (module, MTRC_AGENTS, storage);
   GSLList *list;
 
   if ((list = get_igsl (hash, key)))
@@ -1421,9 +1467,9 @@ ht_get_host_agent_list (GModule module, int key)
  * On error, or if key is not found, 0 is returned.
  * On success the uint64_t value for the given key is returned */
 uint64_t
-ht_get_meta_data (GModule module, const char *key)
+ht_get_meta_data (GModule module, const char *key, GKHashStorage *storage)
 {
-  khash_t (su64) * hash = get_hash (module, MTRC_METADATA);
+  khash_t (su64) * hash = get_hash (module, MTRC_METADATA, storage);
 
   return get_su64 (hash, key);
 }
@@ -1434,9 +1480,9 @@ ht_get_meta_data (GModule module, const char *key)
  * If the hash structure is empty, no values are set.
  * On success the minimum and maximum values are set. */
 void
-ht_get_hits_min_max (GModule module, int *min, int *max)
+ht_get_hits_min_max (GModule module, int *min, int *max, GKHashStorage *storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_HITS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_HITS, storage);
 
   if (!hash)
     return;
@@ -1450,9 +1496,9 @@ ht_get_hits_min_max (GModule module, int *min, int *max)
  * If the hash structure is empty, no values are set.
  * On success the minimum and maximum values are set. */
 void
-ht_get_visitors_min_max (GModule module, int *min, int *max)
+ht_get_visitors_min_max (GModule module, int *min, int *max, GKHashStorage *storage)
 {
-  khash_t (ii32) * hash = get_hash (module, MTRC_VISITORS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_VISITORS, storage);
 
   if (!hash)
     return;
@@ -1466,9 +1512,9 @@ ht_get_visitors_min_max (GModule module, int *min, int *max)
  * If the hash structure is empty, no values are set.
  * On success the minimum and maximum values are set. */
 void
-ht_get_bw_min_max (GModule module, uint64_t * min, uint64_t * max)
+ht_get_bw_min_max (GModule module, uint64_t * min, uint64_t * max, GKHashStorage *storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_BW);
+  khash_t (iu64) * hash = get_hash (module, MTRC_BW, storage);
 
   if (!hash)
     return;
@@ -1482,9 +1528,9 @@ ht_get_bw_min_max (GModule module, uint64_t * min, uint64_t * max)
  * If the hash structure is empty, no values are set.
  * On success the minimum and maximum values are set. */
 void
-ht_get_cumts_min_max (GModule module, uint64_t * min, uint64_t * max)
+ht_get_cumts_min_max (GModule module, uint64_t * min, uint64_t * max, GKHashStorage *storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_CUMTS);
+  khash_t (iu64) * hash = get_hash (module, MTRC_CUMTS, storage);
 
   if (!hash)
     return;
@@ -1498,9 +1544,9 @@ ht_get_cumts_min_max (GModule module, uint64_t * min, uint64_t * max)
  * If the hash structure is empty, no values are set.
  * On success the minimum and maximum values are set. */
 void
-ht_get_maxts_min_max (GModule module, uint64_t * min, uint64_t * max)
+ht_get_maxts_min_max (GModule module, uint64_t * min, uint64_t * max, GKHashStorage *storage)
 {
-  khash_t (iu64) * hash = get_hash (module, MTRC_MAXTS);
+  khash_t (iu64) * hash = get_hash (module, MTRC_MAXTS, storage);
 
   if (!hash)
     return;
@@ -1531,13 +1577,13 @@ init_new_raw_data (GModule module, uint32_t ht_size)
  * On error, NULL is returned.
  * On success the GRawData sorted is returned */
 static GRawData *
-parse_raw_num_data (GModule module)
+parse_raw_num_data (GModule module, GKHashStorage *storage)
 {
   GRawData *raw_data;
   khiter_t key;
   uint32_t ht_size = 0;
 
-  khash_t (ii32) * hash = get_hash (module, MTRC_HITS);
+  khash_t (ii32) * hash = get_hash (module, MTRC_HITS, storage);
   if (!hash)
     return NULL;
 
@@ -1564,13 +1610,13 @@ parse_raw_num_data (GModule module)
  * On error, NULL is returned.
  * On success the GRawData sorted is returned */
 static GRawData *
-parse_raw_str_data (GModule module)
+parse_raw_str_data (GModule module, GKHashStorage *storage)
 {
   GRawData *raw_data;
   khiter_t key;
   uint32_t ht_size = 0;
 
-  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP);
+  khash_t (is32) * hash = get_hash (module, MTRC_DATAMAP, storage);
   if (!hash)
     return NULL;
 
@@ -1597,16 +1643,137 @@ parse_raw_str_data (GModule module)
  * On error, NULL is returned.
  * On success the GRawData sorted is returned */
 GRawData *
-parse_raw_data (GModule module)
+parse_raw_data (GModule module, GKHashStorage *storage)
 {
   GRawData *raw_data;
 
   switch (module) {
   case VISITORS:
-    raw_data = parse_raw_str_data (module);
+    raw_data = parse_raw_str_data (module, storage);
     break;
   default:
-    raw_data = parse_raw_num_data (module);
+    raw_data = parse_raw_num_data (module, storage);
   }
   return raw_data;
 }
+
+/* Insert a string key and the corresponding string value.
+ * Note: If the key exists, the value is not replaced.
+ *
+ * On error, or if key exists, -1 is returned.
+ * On success 0 is returned */
+static int
+ins_ssKvstore (khash_t (ssKvstore) * hash, const char *key, GKHashStorage *value)
+{
+  khint_t k;
+  int ret;
+  char *dupkey = NULL;
+
+  if (!hash)
+    return -1;
+
+  dupkey = xstrdup (key);
+  k = kh_put (ssKvstore, hash, dupkey, &ret);
+  /* operation failed, or key exists */
+  if (ret == -1 || ret == 0) {
+    free (dupkey);
+    return -1;
+  }
+
+  kh_val (hash, k) = value;
+  //we do not dup it.. we will free it later on or on stats collection job
+  //xstrdup (value);
+
+  return 0;
+}
+
+static GKHashStorage *
+get_ssKvstore (khash_t (ssKvstore) * hash, const char *key)
+{
+  khint_t k;
+  GKHashStorage * value = NULL;
+
+  if (!hash)
+    return NULL;
+
+  printf("GOT KEY OF %s", key);
+  k = kh_get (ssKvstore, hash, key);
+  /* key found, return current value pointer do not duplicate it */
+  if (k != kh_end (hash) && (value = kh_val (hash, k)))
+    return value;
+
+  printf("COULD NOT FIND KEY : %s", key);
+
+  return NULL;
+}
+
+//static
+GKHashStorage *
+ht_get_selected()
+{
+    return gkh_selected_storage;
+}
+
+//static
+void
+ht_set_selected(GKHashStorage * st)
+{
+    gkh_selected_storage= st;
+}
+
+//static
+GKHashStorage *
+ht_get_ui_selected()
+{
+    return gkh_selected_storage;
+}
+
+//static
+void
+ht_set_ui_selected(GKHashStorage * st)
+{
+    gkh_selected_storage= st;
+}
+
+
+
+
+
+/* Create a new GKHash Storage for this partner/website
+ *
+ * On error, or if key exists, -1 is returned.
+ * On success 0 is returned */
+int
+ht_insert_gkhmap (const char *key) 
+{
+  khash_t (ssKvstore) * hash = ht_hash;
+
+  printf("AAA\n");
+  if (!hash)
+    return -1;
+  
+  printf("BAA\n");
+  GKHashStorage * val = init_kvstore_storage();
+
+  printf("CAA\n");
+  //set the first storage selected for default UI, later we could change using a rest api / dropdown menu
+  if (gkh_selected_storage == NULL) {
+     gkh_selected_storage = val;
+  }
+  printf("DAA usng key : %s\n", key);
+  return ins_ssKvstore (hash, key, val);
+}
+
+GKHashStorage *
+ht_get_gkhmap (const char *key) 
+{
+  khash_t (ssKvstore) * hash = ht_hash;
+
+  if (!hash)  {
+    printf("HASH WAS NOT INITIALIZED\n");
+    return NULL;
+  }
+
+  return get_ssKvstore (hash, key);
+}
+

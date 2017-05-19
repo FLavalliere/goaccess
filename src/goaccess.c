@@ -258,7 +258,7 @@ allocate_holder_by_module (GModule module)
   GRawData *raw_data;
 
   /* extract data from the corresponding hash table */
-  raw_data = parse_raw_data (module);
+  raw_data = parse_raw_data (module, ht_get_selected());
   if (!raw_data) {
     LOG_DEBUG (("raw data is NULL for module: %d.\n", module));
     return;
@@ -1447,10 +1447,13 @@ main (int argc, char **argv)
     goto clean;
   glog->offset = glog->processed;
 
+  printf("OK Great, we have parsed all the data.. process_log has completed\n");
   /* init reverse lookup thread */
   gdns_init ();
   parse_initial_sort ();
+  printf("OK Great, we have parsed all the data.. going into allocate_holder\n");
   allocate_holder ();
+  printf("OK Great, we have parsed all the data.. after allocate_holder\n");
 
   end_spinner ();
   time (&end_proc);

@@ -1104,12 +1104,12 @@ display_content (WINDOW * win, GDash * dash, GScroll * gscroll)
     /* used module */
     dash->module[module].module = module;
 
-    maxp = get_max_hits_percent (idata, n, ht_get_meta_data (module, "hits"));
+    maxp = get_max_hits_percent (idata, n, ht_get_meta_data (module, "hits", ht_get_ui_selected()));
     dash->module[module].hits_perc_len = get_max_perc_len (maxp);
 
     maxp =
       get_max_visitors_percent (idata, n,
-                                ht_get_meta_data (module, "visitors"));
+                                ht_get_meta_data (module, "visitors", ht_get_ui_selected()));
     dash->module[module].visitors_perc_len = get_max_perc_len (maxp);
 
     /* integer length */

@@ -70,6 +70,7 @@ typedef struct GLogItem_
   char *time;
   char *uniq_key;
   char *vhost;
+  char *shard;
   char *userid;
 
   char site[REF_SITE_LEN + 1];
@@ -156,18 +157,18 @@ typedef struct GParse_
   int (*key_data) (GKeyData * kdata, GLogItem * logitem);
 
   /* data field */
-  void (*datamap) (int data_nkey, const char *data, GModule module);
-  void (*rootmap) (int root_nkey, const char *root, GModule module);
+  void (*datamap) (int data_nkey, const char *data, GModule module, void *);
+  void (*rootmap) (int root_nkey, const char *root, GModule module, void *);
 
   /* metrics */
-  void (*hits) (int data_nkey, GModule module);
-  void (*visitor) (int uniq_nkey, GModule module);
-  void (*bw) (int data_nkey, uint64_t size, GModule module);
-  void (*cumts) (int data_nkey, uint64_t ts, GModule module);
-  void (*maxts) (int data_nkey, uint64_t ts, GModule module);
-  void (*method) (int data_nkey, const char *method, GModule module);
-  void (*protocol) (int data_nkey, const char *proto, GModule module);
-  void (*agent) (int data_nkey, int agent_nkey, GModule module);
+  void (*hits) (int data_nkey, GModule module, void *);
+  void (*visitor) (int uniq_nkey, GModule module, void *);
+  void (*bw) (int data_nkey, uint64_t size, GModule module, void *);
+  void (*cumts) (int data_nkey, uint64_t ts, GModule module, void *);
+  void (*maxts) (int data_nkey, uint64_t ts, GModule module, void *);
+  void (*method) (int data_nkey, const char *method, GModule module, void *);
+  void (*protocol) (int data_nkey, const char *proto, GModule module, void *);
+  void (*agent) (int data_nkey, int agent_nkey, GModule module, void *);
 } GParse;
 
 char *fgetline (FILE * fp);

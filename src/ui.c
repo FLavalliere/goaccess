@@ -460,7 +460,7 @@ get_str_valid_reqs (GLog * glog)
 static char *
 get_str_notfound_reqs (void)
 {
-  return int2str (ht_get_size_datamap (NOT_FOUND), 0);
+  return int2str (ht_get_size_datamap (NOT_FOUND, ht_get_ui_selected()), 0);
 }
 
 /* Convert the number of referrers to a string.
@@ -469,7 +469,7 @@ get_str_notfound_reqs (void)
 static char *
 get_str_ref_reqs (void)
 {
-  return int2str (ht_get_size_datamap (REFERRERS), 0);
+  return int2str (ht_get_size_datamap (REFERRERS, ht_get_ui_selected()), 0);
 }
 
 /* Convert the number of requests to a string.
@@ -478,7 +478,7 @@ get_str_ref_reqs (void)
 static char *
 get_str_reqs (void)
 {
-  return int2str (ht_get_size_datamap (REQUESTS), 0);
+  return int2str (ht_get_size_datamap (REQUESTS, ht_get_ui_selected()), 0);
 }
 
 /* Convert the number of static requests to a string.
@@ -487,7 +487,7 @@ get_str_reqs (void)
 static char *
 get_str_static_reqs (void)
 {
-  return int2str (ht_get_size_datamap (REQUESTS_STATIC), 0);
+  return int2str (ht_get_size_datamap (REQUESTS_STATIC, ht_get_ui_selected()), 0);
 }
 
 /* Convert the number of unique visitors to a string.
@@ -496,7 +496,7 @@ get_str_static_reqs (void)
 static char *
 get_str_visitors (void)
 {
-  return int2str (ht_get_size_uniqmap (VISITORS), 0);
+  return int2str (ht_get_size_uniqmap (VISITORS, ht_get_ui_selected()), 0);
 }
 
 /* Convert the time taken to process the log to a string.
@@ -860,7 +860,7 @@ static int
 fill_host_agents_gmenu (void *val, void *user_data)
 {
   GMenu *menu = user_data;
-  char *agent = ht_get_host_agent_val ((*(int *) val));
+  char *agent = ht_get_host_agent_val ((*(int *) val));// ht_get_ui_selected());
 
   if (agent == NULL)
     return 1;
@@ -934,11 +934,11 @@ set_host_agents (const char *addr, void (*func) (void *, void *, int),
   GSLList *list;
   int data_nkey, count = 0;
 
-  data_nkey = ht_get_keymap (HOSTS, addr);
+  data_nkey = ht_get_keymap (HOSTS, addr, ht_get_ui_selected());
   if (data_nkey == 0)
     return 1;
 
-  list = ht_get_host_agent_list (HOSTS, data_nkey);
+  list = ht_get_host_agent_list (HOSTS, data_nkey, ht_get_ui_selected());
   if (!list)
     return 1;
 

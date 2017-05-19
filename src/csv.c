@@ -219,7 +219,7 @@ print_csv_data (FILE * fp, GHolder * h, GPercTotals totals)
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 /* Output general statistics information. */
 static void
-print_csv_summary (FILE * fp, GLog * glog)
+print_csv_summary (FILE * fp, GLog * glog, GKHashStorage* storage)
 {
   char now[DATE_TIME];
   char *source = NULL;
@@ -255,11 +255,11 @@ print_csv_summary (FILE * fp, GLog * glog)
 
   /* visitors */
   fmt = "\"%d\",,\"%s\",,,,,,,,\"%d\",\"%s\"\r\n";
-  total = ht_get_size_uniqmap (VISITORS);
+  total = ht_get_size_uniqmap (VISITORS, storage);
   fprintf (fp, fmt, i++, GENER_ID, total, OVERALL_VISITORS);
 
   /* files */
-  total = ht_get_size_datamap (REQUESTS);
+  total = ht_get_size_datamap (REQUESTS, storage);
   fprintf (fp, fmt, i++, GENER_ID, total, OVERALL_FILES);
 
   /* excluded hits */
@@ -267,15 +267,15 @@ print_csv_summary (FILE * fp, GLog * glog)
   fprintf (fp, fmt, i++, GENER_ID, total, OVERALL_EXCL_HITS);
 
   /* referrers */
-  total = ht_get_size_datamap (REFERRERS);
+  total = ht_get_size_datamap (REFERRERS, storage);
   fprintf (fp, fmt, i++, GENER_ID, total, OVERALL_REF);
 
   /* not found */
-  total = ht_get_size_datamap (NOT_FOUND);
+  total = ht_get_size_datamap (NOT_FOUND, storage);
   fprintf (fp, fmt, i++, GENER_ID, total, OVERALL_NOTFOUND);
 
   /* static files */
-  total = ht_get_size_datamap (REQUESTS_STATIC);
+  total = ht_get_size_datamap (REQUESTS_STATIC, storage);
   fprintf (fp, fmt, i++, GENER_ID, total, OVERALL_STATIC);
 
   /* log size */
@@ -310,8 +310,11 @@ output_csv (GLog * glog, GHolder * holder, const char *filename)
   if (!fp)
     FATAL ("Unable to open CSV file: %s.", strerror (errno));
 
+  //Bad but only for PoC, get the selected storage variable
+  GKHashStorage* storage = ht_get_selected();
+
   if (!conf.no_csv_summary)
-    print_csv_summary (fp, glog);
+    print_csv_summary (fp, glog, storage);
 
   FOREACH_MODULE (idx, module_list) {
     module = module_list[idx];
@@ -319,7 +322,7 @@ output_csv (GLog * glog, GHolder * holder, const char *filename)
     if (!(panel = panel_lookup (module)))
       continue;
 
-    set_module_totals (module, &totals);
+    set_module_totals (module, &totals, (void *)storage);
     panel->render (fp, holder + module, totals);
   }
 

@@ -96,18 +96,18 @@ static int gen_geolocation_key (GKeyData * kdata, GLogItem * logitem);
 #endif
 
 /* insertion routines */
-static void insert_data (int data_nkey, const char *data, GModule module);
-static void insert_rootmap (int root_nkey, const char *root, GModule module);
+static void insert_data (int data_nkey, const char *data, GModule module, GKHashStorage *storage);
+static void insert_rootmap (int root_nkey, const char *root, GModule module, GKHashStorage *storage);
 
 /* insertion metric routines */
-static void insert_hit (int data_nkey, GModule module);
-static void insert_visitor (int uniq_nkey, GModule module);
-static void insert_bw (int data_nkey, uint64_t size, GModule module);
-static void insert_cumts (int data_nkey, uint64_t ts, GModule module);
-static void insert_maxts (int data_nkey, uint64_t ts, GModule module);
-static void insert_method (int data_nkey, const char *method, GModule module);
-static void insert_protocol (int data_nkey, const char *proto, GModule module);
-static void insert_agent (int data_nkey, int agent_nkey, GModule module);
+static void insert_hit (int data_nkey, GModule module, GKHashStorage *storage);
+static void insert_visitor (int uniq_nkey, GModule module, GKHashStorage *storage);
+static void insert_bw (int data_nkey, uint64_t size, GModule module,GKHashStorage *storage );
+static void insert_cumts (int data_nkey, uint64_t ts, GModule module, GKHashStorage *storage);
+static void insert_maxts (int data_nkey, uint64_t ts, GModule module, GKHashStorage *storage);
+static void insert_method (int data_nkey, const char *method, GModule module, GKHashStorage *storage);
+static void insert_protocol (int data_nkey, const char *proto, GModule module, GKHashStorage *storage);
+static void insert_agent (int data_nkey, int agent_nkey, GModule module, GKHashStorage *storage);
 
 /* *INDENT-OFF* */
 static GParse paneling[] = {
@@ -454,6 +454,7 @@ init_log_item (GLog * glog)
   logitem->time = NULL;
   logitem->uniq_key = NULL;
   logitem->vhost = NULL;
+  logitem->shard = NULL;
   logitem->userid = NULL;
 
   memset (logitem->site, 0, sizeof (logitem->site));
@@ -509,6 +510,8 @@ free_glog (GLogItem * logitem)
     free (logitem->userid);
   if (logitem->vhost != NULL)
     free (logitem->vhost);
+  if (logitem->shard != NULL)
+    free (logitem->shard);
 
   free (logitem);
 }
@@ -784,7 +787,7 @@ contains_usecs (void)
     return;
 
 #ifdef TCB_BTREE
-  ht_insert_genstats ("serve_usecs", 1);
+  ht_insert_genstats ("serve_usecs", 1); //we dont support it.... using the by users...
 #endif
   conf.serve_usecs = 1; /* flag */
 }
@@ -1062,6 +1065,15 @@ parse_specifier (GLogItem * logitem, char **str, const char *p, const char *end)
       return 1;
     }
     logitem->time = tkn;
+    break;
+    /* Shard key */
+  case 'k':
+    if (logitem->shard)
+      return spec_err (logitem, SPEC_TOKN_SET, *p, NULL);
+    tkn = parse_string (&(*str), end, 1);
+    if (tkn == NULL)
+      return spec_err (logitem, SPEC_TOKN_NUL, *p, NULL);
+    logitem->shard = tkn;
     break;
     /* Virtual Host */
   case 'v':
@@ -1749,16 +1761,16 @@ is_404 (GLogItem * logitem)
  * On error, -1 is returned.
  * On success the value of the key inserted is returned */
 static int
-insert_keymap (char *key, GModule module)
+insert_keymap (char *key, GModule module, GKHashStorage *storage)
 {
-  return ht_insert_keymap (module, key);
+  return ht_insert_keymap (module, key, storage);
 }
 
 /* A wrapper function to insert a datamap int key and string value. */
 static void
-insert_data (int nkey, const char *data, GModule module)
+insert_data (int nkey, const char *data, GModule module, GKHashStorage *storage)
 {
-  ht_insert_datamap (module, nkey, data);
+  ht_insert_datamap (module, nkey, data, storage);
 }
 
 /* A wrapper function to insert a uniqmap string key.
@@ -1767,91 +1779,91 @@ insert_data (int nkey, const char *data, GModule module)
  * On error, -1 is returned.
  * On success the value of the key inserted is returned */
 static int
-insert_uniqmap (char *uniq_key, GModule module)
+insert_uniqmap (char *uniq_key, GModule module, GKHashStorage *storage)
 {
-  return ht_insert_uniqmap (module, uniq_key);
+  return ht_insert_uniqmap (module, uniq_key, storage);
 }
 
 /* A wrapper function to insert a rootmap int key from the keymap
  * store mapped to its string value. */
 static void
-insert_rootmap (int root_nkey, const char *root, GModule module)
+insert_rootmap (int root_nkey, const char *root, GModule module, GKHashStorage *storage)
 {
-  ht_insert_rootmap (module, root_nkey, root);
+  ht_insert_rootmap (module, root_nkey, root, storage);
 }
 
 /* A wrapper function to insert a data int key mapped to the
  * corresponding int root key. */
 static void
-insert_root (int data_nkey, int root_nkey, GModule module)
+insert_root (int data_nkey, int root_nkey, GModule module, GKHashStorage *storage)
 {
-  ht_insert_root (module, data_nkey, root_nkey);
+  ht_insert_root (module, data_nkey, root_nkey, storage);
 }
 
 /* A wrapper function to increase hits counter from an int key. */
 static void
-insert_hit (int data_nkey, GModule module)
+insert_hit (int data_nkey, GModule module, GKHashStorage *storage)
 {
-  ht_insert_hits (module, data_nkey, 1);
-  ht_insert_meta_data (module, "hits", 1);
+  ht_insert_hits (module, data_nkey, 1, storage);
+  ht_insert_meta_data (module, "hits", 1, storage);
 }
 
 /* A wrapper function to increase visitors counter from an int
  * key. */
 static void
-insert_visitor (int uniq_nkey, GModule module)
+insert_visitor (int uniq_nkey, GModule module, GKHashStorage *storage)
 {
-  ht_insert_visitor (module, uniq_nkey, 1);
-  ht_insert_meta_data (module, "visitors", 1);
+  ht_insert_visitor (module, uniq_nkey, 1, storage);
+  ht_insert_meta_data (module, "visitors", 1, storage);
 }
 
 /* A wrapper function to increases bandwidth counter from an int
  * key. */
 static void
-insert_bw (int data_nkey, uint64_t size, GModule module)
+insert_bw (int data_nkey, uint64_t size, GModule module, GKHashStorage *storage)
 {
-  ht_insert_bw (module, data_nkey, size);
-  ht_insert_meta_data (module, "bytes", size);
+  ht_insert_bw (module, data_nkey, size, storage);
+  ht_insert_meta_data (module, "bytes", size, storage);
 }
 
 /* A wrapper call to increases cumulative time served counter
  * from an int key. */
 static void
-insert_cumts (int data_nkey, uint64_t ts, GModule module)
+insert_cumts (int data_nkey, uint64_t ts, GModule module, GKHashStorage *storage)
 {
-  ht_insert_cumts (module, data_nkey, ts);
-  ht_insert_meta_data (module, "cumts", ts);
+  ht_insert_cumts (module, data_nkey, ts, storage);
+  ht_insert_meta_data (module, "cumts", ts, storage);
 }
 
 /* A wrapper call to insert the maximum time served counter from
  * an int key. */
 static void
-insert_maxts (int data_nkey, uint64_t ts, GModule module)
+insert_maxts (int data_nkey, uint64_t ts, GModule module, GKHashStorage *storage)
 {
-  ht_insert_maxts (module, data_nkey, ts);
-  ht_insert_meta_data (module, "maxts", ts);
+  ht_insert_maxts (module, data_nkey, ts, storage);
+  ht_insert_meta_data (module, "maxts", ts, storage);
 }
 
 static void
-insert_method (int nkey, const char *data, GModule module)
+insert_method (int nkey, const char *data, GModule module, GKHashStorage *storage)
 {
-  ht_insert_method (module, nkey, data ? data : "---");
+  ht_insert_method (module, nkey, data ? data : "---", storage);
 }
 
 /* A wrapper call to insert a method given an int key and string
  * value. */
 static void
-insert_protocol (int nkey, const char *data, GModule module)
+insert_protocol (int nkey, const char *data, GModule module, GKHashStorage *storage)
 {
-  ht_insert_protocol (module, nkey, data ? data : "---");
+  ht_insert_protocol (module, nkey, data ? data : "---", storage);
 }
 
 /* A wrapper call to insert an agent for a hostname given an int
  * key and int value.  */
 static void
-insert_agent (int data_nkey, int agent_nkey, GModule module)
+insert_agent (int data_nkey, int agent_nkey, GModule module, GKHashStorage *storage)
 {
-  ht_insert_agent (module, data_nkey, agent_nkey);
+  ht_insert_agent (module, data_nkey, agent_nkey, storage);
 }
 
 /* The following generates a unique key to identity unique visitors.
@@ -2382,48 +2394,48 @@ intkeys2str (int a, int b)
 
 /* Determine which data metrics need to be set and set them. */
 static void
-set_datamap (GLogItem * logitem, GKeyData * kdata, const GParse * parse)
+set_datamap (GLogItem * logitem, GKeyData * kdata, const GParse * parse, GKHashStorage *storage)
 {
   GModule module;
   module = parse->module;
 
   /* insert data */
-  parse->datamap (kdata->data_nkey, kdata->data, module);
+  parse->datamap (kdata->data_nkey, kdata->data, module, storage); //Warning this is a GParse function reference see Gparse stsructure.. 
 
   /* insert rootmap and root-data map */
   if (parse->rootmap) {
-    parse->rootmap (kdata->root_nkey, kdata->root, module);
-    insert_root (kdata->data_nkey, kdata->root_nkey, module);
+    parse->rootmap (kdata->root_nkey, kdata->root, module, storage);
+    insert_root (kdata->data_nkey, kdata->root_nkey, module, storage);
   }
   /* insert hits */
   if (parse->hits)
-    parse->hits (kdata->data_nkey, module);
+    parse->hits (kdata->data_nkey, module, storage);
   /* insert visitors */
   if (parse->visitor && kdata->uniq_nkey != 0)
-    parse->visitor (kdata->data_nkey, module);
+    parse->visitor (kdata->data_nkey, module, storage);
   /* insert bandwidth */
   if (parse->bw)
-    parse->bw (kdata->data_nkey, logitem->resp_size, module);
+    parse->bw (kdata->data_nkey, logitem->resp_size, module, storage);
   /* insert averages time served */
   if (parse->cumts)
-    parse->cumts (kdata->data_nkey, logitem->serve_time, module);
+    parse->cumts (kdata->data_nkey, logitem->serve_time, module, storage);
   /* insert averages time served */
   if (parse->maxts)
-    parse->maxts (kdata->data_nkey, logitem->serve_time, module);
+    parse->maxts (kdata->data_nkey, logitem->serve_time, module, storage);
   /* insert method */
   if (parse->method && conf.append_method)
-    parse->method (kdata->data_nkey, logitem->method, module);
+    parse->method (kdata->data_nkey, logitem->method, module, storage);
   /* insert protocol */
   if (parse->protocol && conf.append_protocol)
-    parse->protocol (kdata->data_nkey, logitem->protocol, module);
+    parse->protocol (kdata->data_nkey, logitem->protocol, module, storage);
   /* insert agent */
   if (parse->agent && conf.list_agents)
-    parse->agent (kdata->data_nkey, logitem->agent_nkey, module);
+    parse->agent (kdata->data_nkey, logitem->agent_nkey, module, storage);
 }
 
 /* Set data mapping and metrics. */
 static void
-map_log (GLogItem * logitem, const GParse * parse, GModule module)
+map_log (GLogItem * logitem, const GParse * parse, GModule module, GKHashStorage *storage )
 {
   GKeyData kdata;
   char *uniq_key = NULL;
@@ -2434,23 +2446,23 @@ map_log (GLogItem * logitem, const GParse * parse, GModule module)
 
   /* each module requires a data key/value */
   if (parse->datamap && kdata.data_key)
-    kdata.data_nkey = insert_keymap (kdata.data_key, module);
+    kdata.data_nkey = insert_keymap (kdata.data_key, module, storage);
 
   /* each module contains a uniq visitor key/value */
   if (parse->visitor && logitem->uniq_key && include_uniq (logitem)) {
     uniq_key = intkeys2str (logitem->uniq_nkey, kdata.data_nkey);
     /* unique key already exists? */
-    kdata.uniq_nkey = insert_uniqmap (uniq_key, module);
+    kdata.uniq_nkey = insert_uniqmap (uniq_key, module, storage);
     free (uniq_key);
   }
 
   /* root keys are optional */
   if (parse->rootmap && kdata.root_key)
-    kdata.root_nkey = insert_keymap (kdata.root_key, module);
+    kdata.root_nkey = insert_keymap (kdata.root_key, module, storage);
 
   /* each module requires a root key/value */
   if (parse->datamap && kdata.data_key)
-    set_datamap (logitem, &kdata, parse);
+    set_datamap (logitem, &kdata, parse, storage);
 }
 
 /* Process a log line and set the data into the corresponding data
@@ -2461,10 +2473,33 @@ process_log (GLogItem * logitem)
   GModule module;
   const GParse *parse = NULL;
   size_t idx = 0;
+  
+  //HERE WE NEED TO SELECT THE SHARD
+  char * key = logitem->shard;
+  GKHashStorage* storage = NULL;
+
+  printf("Will use shard key of %s", key);
+  storage = ht_get_gkhmap(key);
+  if ( storage == NULL) {
+      int t = ht_insert_gkhmap (key);
+      if (t >= 0) {
+         storage = ht_get_gkhmap(key);
+      }
+  }
+  if ( storage == NULL) {
+     printf("Error, shard key was null\n");
+     //die here
+  }
+
+  // later we should gather a set of lines ( ie: 1000 ) and short them by the shard key so we reduce amount of Map loookups and reduce CPU
+
+  // set selected key for processing
+  ht_set_selected(storage);
+
 
   /* Insert one unique visitor key per request to avoid the
    * overhead of storing one key per module */
-  logitem->uniq_nkey = ht_insert_unique_key (logitem->uniq_key);
+  logitem->uniq_nkey = ht_insert_unique_key (logitem->uniq_key);// should we make it per storageMap leave it global for now save memory ?, storage);
 
   /* If we need to store user agents per IP, then we store them and retrieve
    * its numeric key.
@@ -2472,16 +2507,16 @@ process_log (GLogItem * logitem)
    * map for value -> key*/
   if (conf.list_agents) {
     /* insert UA key and get a numeric value */
-    logitem->agent_nkey = ht_insert_agent_key (logitem->agent);
+    logitem->agent_nkey = ht_insert_agent_key (logitem->agent);// storage);
     /* insert a numeric key and map it to a UA string */
-    ht_insert_agent_value (logitem->agent_nkey, logitem->agent);
+    ht_insert_agent_value (logitem->agent_nkey, logitem->agent);//, storage);
   }
 
   FOREACH_MODULE (idx, module_list) {
     module = module_list[idx];
     if (!(parse = panel_lookup (module)))
       continue;
-    map_log (logitem, parse, module);
+    map_log (logitem, parse, module, storage);
   }
 }
 

@@ -60,10 +60,10 @@ typedef struct GPanel_
 } GPanel;
 
 static void add_data_to_holder (GRawDataItem item, GHolder * h,
-                                GRawDataType type, const GPanel * panel);
+                                GRawDataType type, const GPanel * panel, GKHashStorage *storage);
 static void add_root_to_holder (GRawDataItem item, GHolder * h,
-                                GRawDataType type, const GPanel * panel);
-static void add_host_child_to_holder (GHolder * h);
+                                GRawDataType type, const GPanel * panel, GKHashStorage *storage);
+static void add_host_child_to_holder (GHolder * h, GKHashStorage *storage);
 
 /* *INDENT-OFF* */
 static GPanel paneling[] = {
@@ -397,7 +397,7 @@ set_host_sub_list (GHolder * h, GSubList * sub_list)
  *
  * On success, the host panel data is set. */
 static void
-add_host_child_to_holder (GHolder * h)
+add_host_child_to_holder (GHolder * h, GKHashStorage *storage)
 {
   GMetrics *nmetrics;
   GSubList *sub_list = new_gsublist ();
@@ -435,14 +435,14 @@ add_host_child_to_holder (GHolder * h)
  * On success, the data and hits values are set and 0 is returned. */
 static int
 set_data_hits_keys (GModule module, GRawDataItem item, GRawDataType type,
-                    char **data, int *hits)
+                    char **data, int *hits, GKHashStorage *storage)
 {
   if (type == INTEGER) {
-    if (!(*data = ht_get_datamap (module, item.key)))
+    if (!(*data = ht_get_datamap (module, item.key, storage)))
       return 1;
     *hits = item.value.ivalue;
   } else if (type == STRING) {
-    if (!(*hits = ht_get_hits (module, item.key)))
+    if (!(*hits = ht_get_hits (module, item.key, storage)))
       return 1;
     *data = xstrdup (item.value.svalue);
   }
@@ -453,19 +453,19 @@ set_data_hits_keys (GModule module, GRawDataItem item, GRawDataType type,
  * contain sub items. A function pointer is used for post data set. */
 static void
 add_data_to_holder (GRawDataItem item, GHolder * h, GRawDataType type,
-                    const GPanel * panel)
+                    const GPanel * panel, GKHashStorage * storage)
 {
   char *data = NULL, *method = NULL, *protocol = NULL;
   int hits = 0, visitors = 0;
   uint64_t bw = 0, cumts = 0, maxts = 0;
 
-  if (set_data_hits_keys (h->module, item, type, &data, &hits) == 1)
+  if (set_data_hits_keys (h->module, item, type, &data, &hits, storage) == 1)
     return;
 
-  bw = ht_get_bw (h->module, item.key);
-  cumts = ht_get_cumts (h->module, item.key);
-  maxts = ht_get_maxts (h->module, item.key);
-  visitors = ht_get_visitors (h->module, item.key);
+  bw = ht_get_bw (h->module, item.key, storage);
+  cumts = ht_get_cumts (h->module, item.key, storage);
+  maxts = ht_get_maxts (h->module, item.key, storage);
+  visitors = ht_get_visitors (h->module, item.key, storage);
 
   h->items[h->idx].metrics = new_gmetrics ();
   h->items[h->idx].metrics->hits = hits;
@@ -477,12 +477,12 @@ add_data_to_holder (GRawDataItem item, GHolder * h, GRawDataType type,
   h->items[h->idx].metrics->maxts.nts = maxts;
 
   if (conf.append_method) {
-    method = ht_get_method (h->module, item.key);
+    method = ht_get_method (h->module, item.key, storage);
     h->items[h->idx].metrics->method = method;
   }
 
   if (conf.append_protocol) {
-    protocol = ht_get_protocol (h->module, item.key);
+    protocol = ht_get_protocol (h->module, item.key, storage);
     h->items[h->idx].metrics->protocol = protocol;
   }
 
@@ -495,20 +495,20 @@ add_data_to_holder (GRawDataItem item, GHolder * h, GRawDataType type,
 /* Set all root panel data. This will set the root nodes. */
 static int
 set_root_metrics (GRawDataItem item, GRawDataType type, GModule module,
-                  GMetrics ** nmetrics)
+                  GMetrics ** nmetrics, GKHashStorage *storage)
 {
   GMetrics *metrics;
   char *data = NULL;
   uint64_t bw = 0, cumts = 0, maxts = 0;
   int hits = 0, visitors = 0;
 
-  if (set_data_hits_keys (module, item, type, &data, &hits) == 1)
+  if (set_data_hits_keys (module, item, type, &data, &hits, storage) == 1)
     return 1;
 
-  bw = ht_get_bw (module, item.key);
-  cumts = ht_get_cumts (module, item.key);
-  maxts = ht_get_maxts (module, item.key);
-  visitors = ht_get_visitors (module, item.key);
+  bw = ht_get_bw (module, item.key, storage);
+  cumts = ht_get_cumts (module, item.key, storage);
+  maxts = ht_get_maxts (module, item.key, storage);
+  visitors = ht_get_visitors (module, item.key, storage);
 
   metrics = new_gmetrics ();
   metrics->avgts.nts = cumts / hits;
@@ -526,17 +526,17 @@ set_root_metrics (GRawDataItem item, GRawDataType type, GModule module,
 /* Set all root panel data, including sub list items. */
 static void
 add_root_to_holder (GRawDataItem item, GHolder * h, GRawDataType type,
-                    GO_UNUSED const GPanel * panel)
+                    GO_UNUSED const GPanel * panel, GKHashStorage *storage)
 {
   GSubList *sub_list;
   GMetrics *metrics, *nmetrics;
   char *root = NULL;
   int root_idx = KEY_NOT_FOUND, idx = 0;
 
-  if (set_root_metrics (item, type, h->module, &nmetrics) == 1)
+  if (set_root_metrics (item, type, h->module, &nmetrics, storage) == 1)
     return;
 
-  if (!(root = (ht_get_root (h->module, item.key))))
+  if (!(root = (ht_get_root (h->module, item.key, storage))))
     return;
 
   /* add data as a child node into holder */

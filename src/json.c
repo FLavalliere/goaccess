@@ -532,7 +532,7 @@ poverall_processed_time (GJSON * json, int sp)
 static void
 poverall_visitors (GJSON * json, int sp)
 {
-  pskeyival (json, OVERALL_VISITORS, ht_get_size_uniqmap (VISITORS), sp, 0);
+  pskeyival (json, OVERALL_VISITORS, ht_get_size_uniqmap (VISITORS, ht_get_selected()), sp, 0);
 }
 
 /* Write to a buffer the total number of unique files under the
@@ -540,7 +540,7 @@ poverall_visitors (GJSON * json, int sp)
 static void
 poverall_files (GJSON * json, int sp)
 {
-  pskeyival (json, OVERALL_FILES, ht_get_size_datamap (REQUESTS), sp, 0);
+  pskeyival (json, OVERALL_FILES, ht_get_size_datamap (REQUESTS, ht_get_selected()), sp, 0);
 }
 
 /* Write to a buffer the total number of excluded requests under the
@@ -555,7 +555,7 @@ poverall_excluded (GJSON * json, GLog * glog, int sp)
 static void
 poverall_refs (GJSON * json, int sp)
 {
-  pskeyival (json, OVERALL_REF, ht_get_size_datamap (REFERRERS), sp, 0);
+  pskeyival (json, OVERALL_REF, ht_get_size_datamap (REFERRERS, ht_get_selected()), sp, 0);
 }
 
 /* Write to a buffer the number of not found (404s) under the overall
@@ -563,7 +563,7 @@ poverall_refs (GJSON * json, int sp)
 static void
 poverall_notfound (GJSON * json, int sp)
 {
-  pskeyival (json, OVERALL_NOTFOUND, ht_get_size_datamap (NOT_FOUND), sp, 0);
+  pskeyival (json, OVERALL_NOTFOUND, ht_get_size_datamap (NOT_FOUND, ht_get_selected()), sp, 0);
 }
 
 /* Write to a buffer the number of static files (jpg, pdf, etc) under
@@ -571,7 +571,7 @@ poverall_notfound (GJSON * json, int sp)
 static void
 poverall_static_files (GJSON * json, int sp)
 {
-  pskeyival (json, OVERALL_STATIC, ht_get_size_datamap (REQUESTS_STATIC), sp,
+  pskeyival (json, OVERALL_STATIC, ht_get_size_datamap (REQUESTS_STATIC, ht_get_selected()), sp,
              0);
 }
 
@@ -746,14 +746,14 @@ pmeta_data_hits (GJSON * json, GModule module, int sp)
   int isp = 0;
   int max = 0, min = 0;
 
-  ht_get_hits_min_max (module, &min, &max);
+  ht_get_hits_min_max (module, &min, &max, ht_get_selected());
 
   /* use tabs to prettify output */
   if (conf.json_pretty_print)
     isp = sp + 1;
 
   popen_obj_attr (json, "hits", sp);
-  pskeyu64val (json, "count", ht_get_meta_data (module, "hits"), isp, 0);
+  pskeyu64val (json, "count", ht_get_meta_data (module, "hits", ht_get_selected()), isp, 0);
   pskeyival (json, "max", max, isp, 0);
   pskeyival (json, "min", min, isp, 1);
   pclose_obj (json, sp, 0);
@@ -766,14 +766,14 @@ pmeta_data_visitors (GJSON * json, GModule module, int sp)
   int isp = 0;
   int max = 0, min = 0;
 
-  ht_get_visitors_min_max (module, &min, &max);
+  ht_get_visitors_min_max (module, &min, &max, ht_get_selected());
 
   /* use tabs to prettify output */
   if (conf.json_pretty_print)
     isp = sp + 1;
 
   popen_obj_attr (json, "visitors", sp);
-  pskeyu64val (json, "count", ht_get_meta_data (module, "visitors"), isp, 0);
+  pskeyu64val (json, "count", ht_get_meta_data (module, "visitors", ht_get_selected()), isp, 0);
   pskeyival (json, "max", max, isp, 0);
   pskeyival (json, "min", min, isp, 1);
   pclose_obj (json, sp, 0);
@@ -789,14 +789,14 @@ pmeta_data_bw (GJSON * json, GModule module, int sp)
   if (!conf.bandwidth)
     return;
 
-  ht_get_bw_min_max (module, &min, &max);
+  ht_get_bw_min_max (module, &min, &max, ht_get_selected());
 
   /* use tabs to prettify output */
   if (conf.json_pretty_print)
     isp = sp + 1;
 
   popen_obj_attr (json, "bytes", sp);
-  pskeyu64val (json, "count", ht_get_meta_data (module, "bytes"), isp, 0);
+  pskeyu64val (json, "count", ht_get_meta_data (module, "bytes", ht_get_selected()), isp, 0);
   pskeyu64val (json, "max", max, isp, 0);
   pskeyu64val (json, "min", min, isp, 1);
   pclose_obj (json, sp, 0);
@@ -817,8 +817,8 @@ pmeta_data_avgts (GJSON * json, GModule module, int sp)
   if (conf.json_pretty_print)
     isp = sp + 1;
 
-  cumts = ht_get_meta_data (module, "cumts");
-  hits = ht_get_meta_data (module, "hits");
+  cumts = ht_get_meta_data (module, "cumts", ht_get_selected());
+  hits = ht_get_meta_data (module, "hits", ht_get_selected());
   if (hits > 0)
     avg = cumts / hits;
 
@@ -837,14 +837,14 @@ pmeta_data_cumts (GJSON * json, GModule module, int sp)
   if (!conf.serve_usecs)
     return;
 
-  ht_get_cumts_min_max (module, &min, &max);
+  ht_get_cumts_min_max (module, &min, &max, ht_get_selected());
 
   /* use tabs to prettify output */
   if (conf.json_pretty_print)
     isp = sp + 1;
 
   popen_obj_attr (json, "cumts", sp);
-  pskeyu64val (json, "count", ht_get_meta_data (module, "cumts"), isp, 0);
+  pskeyu64val (json, "count", ht_get_meta_data (module, "cumts", ht_get_selected()), isp, 0);
   pskeyu64val (json, "max", max, isp, 0);
   pskeyu64val (json, "min", min, isp, 1);
   pclose_obj (json, sp, 0);
@@ -860,14 +860,14 @@ pmeta_data_maxts (GJSON * json, GModule module, int sp)
   if (!conf.serve_usecs)
     return;
 
-  ht_get_maxts_min_max (module, &min, &max);
+  ht_get_maxts_min_max (module, &min, &max, ht_get_selected());
 
   /* use tabs to prettify output */
   if (conf.json_pretty_print)
     isp = sp + 1;
 
   popen_obj_attr (json, "maxts", sp);
-  pskeyu64val (json, "count", ht_get_meta_data (module, "maxts"), isp, 0);
+  pskeyu64val (json, "count", ht_get_meta_data (module, "maxts", ht_get_selected()), isp, 0);
   pskeyu64val (json, "max", max, isp, 0);
   pskeyu64val (json, "min", min, isp, 1);
   pclose_obj (json, sp, 0);
@@ -929,7 +929,7 @@ static int
 fill_host_agents (void *val, void *user_data)
 {
   GAgents *agents = user_data;
-  char *agent = ht_get_host_agent_val ((*(int *) val));
+  char *agent = ht_get_host_agent_val ((*(int *) val));// ht_get_selected());
 
   if (agent == NULL)
     return 1;
@@ -1184,7 +1184,7 @@ init_json_output (GLog * glog, GHolder * holder)
     if (!(panel = panel_lookup (module)))
       continue;
 
-    set_module_totals (module, &totals);
+    set_module_totals (module, &totals, ht_get_selected());
     panel->render (json, holder + module, totals, panel);
     pjson (json, (cnt++ != npanels - 1) ? ",%.*s" : "%.*s", nlines, NL);
   }
